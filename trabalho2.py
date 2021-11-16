@@ -76,8 +76,8 @@ def dct2d(X: np.ndarray) -> np.ndarray:
 
 def main(argc, argv) -> int:
     assert argc >= 2, "Arguments should be greater than 2" 
-    image_input_arr = get_image_as_arr(argv[argc-1])
-    image_frequency_domain = np.zeros((256,256))
+    # image_input_arr = get_image_as_arr(argv[argc-1])
+    # image_frequency_domain = np.zeros((256,256))
     
     # for i in range(256):
     #     image_frequency_domain[i, :] = dct1d(image_input_arr[i, :])
@@ -88,7 +88,7 @@ def main(argc, argv) -> int:
     # dct_image.show()
 
     w,h = 256,256
-    test_arr = generate_cosine_2d_arr_horizontal(w,h)*generate_cosine_2d_arr_vertical(w,np.half)*255
+    test_arr = generate_cosine_2d_arr_horizontal(w,h)*generate_cosine_2d_arr_vertical(w,h)*255
     test_arr *= (255.0/test_arr.max())
     test_image_before = Image.fromarray(test_arr)
     test_image_before.show()
