@@ -48,18 +48,63 @@ def dct(x: np.array) -> np.array:
 def idct(X: np.array) -> np.array:
     assert False, "TODO: implement iDCT"
 
-def main(argc, argv):
+def generate_cosine_2d_arr_vertical(w: int, h:int) -> np.ndarray:
+    arr = np.zeros((w,h))
+    # step = 2*math.pi/w
+    # print(step)
+    for j in range(h):
+        arr[:,j] = np.cos(np.linspace(0, 32*math.pi, num=w))
+    return arr
+
+def generate_cosine_2d_arr_horizontal(w: int, h:int) -> np.ndarray:
+    arr = np.zeros((w,h))
+    # step = 2*math.pi/w
+    # print(step)
+    for i in range(h):
+        arr[i,:] = np.cos(np.linspace(0, 32*math.pi, num=w))
+    return arr
+
+def dct2d(X: np.ndarray) -> np.ndarray:
+    w,h = X.shape
+    X_arr_in_freq_domain  = np.zeros((X.shape))
+    for i in range(w):
+        X_arr_in_freq_domain[i,:] = dct(X[i,:])
+    for j in range(h):
+        X_arr_in_freq_domain[:, j] = dct(X_arr_in_freq_domain[:,j])
+    return 
+
+
+def main(argc, argv) -> int:
+    assert argc >= 2, "Arguments should be greater than 2" 
     image_input_arr = get_image_as_arr(argv[argc-1])
-    image_frequency_domain = np.ndarray((256,256))
+    image_frequency_domain = np.zeros((256,256))
+    
     for i in range(256):
         # TODO: test if dct works
-        image_frequency_domain[i] = dct(image_input_arr[i])
+        image_frequency_domain[i, :] = dct(image_input_arr[i, :])
     for j in range(256):
-        image_frequency_domain[:,j] = dct(image_input_arr[:,j])
-    # NOTE: working? how i normalize the image???
-    dct_image = Image.fromarray(np.abs(image_frequency_domain)*255)
-    # FIXME: Currently not working
+        image_frequency_domain[:, j] = dct(image_frequency_domain[:, j])
+    image_frequency_domain *= (255.0/image_frequency_domain.max())
+    dct_image = Image.fromarray(np.log(image_frequency_domain)+1)
     dct_image.show()
+
+    # w,h = 256,256
+    # test_arr = generate_cosine_2d_arr_horizontal(w,h)*generate_cosine_2d_arr_vertical(w,np.half)*255
+    # test_arr *= (255.0/test_arr.max())
+    # test_image_before = Image.fromarray(test_arr)
+    # test_image_before.show()
+    # test_arr_in_freq_domain  = np.zeros((w,h))
+    # for i in range(w):
+    #     test_arr_in_freq_domain[i,:] = dct(test_arr[i,:])
+    # for j in range(h):
+    #     test_arr_in_freq_domain[:, j] = dct(test_arr_in_freq_domain[:,j])
+    # test_arr_in_freq_domain *= (255.0/test_arr_in_freq_domain.max())
+    # test_image_after = Image.fromarray(test_arr_in_freq_domain)
+    # test_image_after.show()
+    # print(test_arr_in_freq_domain)
+    return 0
+
+
 
 
 if __name__ == "__main__":
