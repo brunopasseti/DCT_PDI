@@ -29,7 +29,7 @@ def get_wav_as_arr(path, normalised=True) -> np.array:
         return audio_normalised
     return audio_as_np_float32
 
-def dct(x: np.array) -> np.array:
+def dct1d(x: np.array) -> np.array:
     N = len(x)
     ks = list(range(N))
     c_k = [1 if k == 0 else (0.5)**0.5 for k in range(N)]
@@ -68,9 +68,9 @@ def dct2d(X: np.ndarray) -> np.ndarray:
     w,h = X.shape
     X_arr_in_freq_domain  = np.zeros((X.shape))
     for i in range(w):
-        X_arr_in_freq_domain[i,:] = dct(X[i,:])
+        X_arr_in_freq_domain[i,:] = dct1d(X[i,:])
     for j in range(h):
-        X_arr_in_freq_domain[:, j] = dct(X_arr_in_freq_domain[:,j])
+        X_arr_in_freq_domain[:, j] = dct1d(X_arr_in_freq_domain[:,j])
     return 
 
 
@@ -79,29 +79,28 @@ def main(argc, argv) -> int:
     image_input_arr = get_image_as_arr(argv[argc-1])
     image_frequency_domain = np.zeros((256,256))
     
-    for i in range(256):
-        # TODO: test if dct works
-        image_frequency_domain[i, :] = dct(image_input_arr[i, :])
-    for j in range(256):
-        image_frequency_domain[:, j] = dct(image_frequency_domain[:, j])
-    image_frequency_domain *= (255.0/image_frequency_domain.max())
-    dct_image = Image.fromarray(np.log(image_frequency_domain)+1)
-    dct_image.show()
+    # for i in range(256):
+    #     image_frequency_domain[i, :] = dct1d(image_input_arr[i, :])
+    # for j in range(256):
+    #     image_frequency_domain[:, j] = dct1d(image_frequency_domain[:, j])
+    # image_frequency_domain *= (255.0/image_frequency_domain.max())
+    # dct_image = Image.fromarray(np.log(image_frequency_domain)+1)
+    # dct_image.show()
 
-    # w,h = 256,256
-    # test_arr = generate_cosine_2d_arr_horizontal(w,h)*generate_cosine_2d_arr_vertical(w,np.half)*255
-    # test_arr *= (255.0/test_arr.max())
-    # test_image_before = Image.fromarray(test_arr)
-    # test_image_before.show()
-    # test_arr_in_freq_domain  = np.zeros((w,h))
-    # for i in range(w):
-    #     test_arr_in_freq_domain[i,:] = dct(test_arr[i,:])
-    # for j in range(h):
-    #     test_arr_in_freq_domain[:, j] = dct(test_arr_in_freq_domain[:,j])
-    # test_arr_in_freq_domain *= (255.0/test_arr_in_freq_domain.max())
-    # test_image_after = Image.fromarray(test_arr_in_freq_domain)
-    # test_image_after.show()
-    # print(test_arr_in_freq_domain)
+    w,h = 256,256
+    test_arr = generate_cosine_2d_arr_horizontal(w,h)*generate_cosine_2d_arr_vertical(w,np.half)*255
+    test_arr *= (255.0/test_arr.max())
+    test_image_before = Image.fromarray(test_arr)
+    test_image_before.show()
+    test_arr_in_freq_domain  = np.zeros((w,h))
+    for i in range(w):
+        test_arr_in_freq_domain[i,:] = dct1d(test_arr[i,:])
+    for j in range(h):
+        test_arr_in_freq_domain[:, j] = dct1d(test_arr_in_freq_domain[:,j])
+    test_arr_in_freq_domain *= (255.0/test_arr_in_freq_domain.max())
+    test_image_after = Image.fromarray(test_arr_in_freq_domain)
+    test_image_after.show()
+    print(test_arr_in_freq_domain)
     return 0
 
 
