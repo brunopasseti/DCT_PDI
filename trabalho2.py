@@ -6,6 +6,7 @@ import sys
 import wave
 import math
 from numba import njit, jit
+from numpy.lib.type_check import imag
 
 def get_image_as_arr(path) -> np.ndarray:
     image_input = Image.open(path)
@@ -50,8 +51,9 @@ def dct1d(x: np.array) -> np.array:
         X[ks[i]] = constant_part * c_k[ks[i]]*sum
     return X
 
+@njit
 def idct(x: np.array) -> np.array:
-    assert False, "TODO: implement iDCT"
+    return dct1d(x)
 
 def generate_cosine_2d_arr_vertical(w: int, h:int) -> np.ndarray:
     arr = np.zeros((w,h))
@@ -76,7 +78,7 @@ def dct2d(x: np.ndarray) -> np.ndarray:
         X_arr_in_freq_domain[i,:] = dct1d(x[i,:])
     for j in range(h):
         X_arr_in_freq_domain[:,j] = dct1d(X_arr_in_freq_domain[:,j])
-    return 
+    return X_arr_in_freq_domain
 
 def new_dct(x):
     N = len(x)
@@ -91,6 +93,8 @@ def new_dct(x):
     c_k = [(1/(4*N))**0.5 if k == 0 else (1/(2*N))**0.5 for k in range(N)]
     return X
 
+def normalize255(arr: np.ndarray):
+    return arr*(255.0/arr.max())
 
 def debug_dct():
     w:int = 256
@@ -99,40 +103,45 @@ def debug_dct():
     cos_arr_v = generate_cosine_2d_arr_vertical(w,h)
     test_arr = cos_arr_v*cos_arr_h*255
     test_arr *= (255.0/test_arr.max())
+    print(test_arr)
     test_image_before = Image.fromarray(test_arr)
     test_image_before.show()
-    test_arr_in_freq_domain  = np.zeros((w,h))
-    for i in range(w):
-        test_arr_in_freq_domain[i,:] = dct1d(test_arr[i,:])
-    for j in range(h):
-        test_arr_in_freq_domain[:, j] = dct1d(test_arr_in_freq_domain[:,j])
-    test_arr_in_freq_domain *= (255.0/test_arr_in_freq_domain.max())
-    test_image_after = Image.fromarray(test_arr_in_freq_domain)
+    test_array_frequency_domain = np.zeros((256,256))
+    test_array_frequency_domain = dct2d(test_arr)
+    test_array_frequency_domain_normalized = normalize255(test_array_frequency_domain)
+    test_image_after = Image.fromarray(test_array_frequency_domain_normalized)
     test_image_after.show()
-    print(test_arr_in_freq_domain)
+    print(test_array_frequency_domain_normalized)
     
 def run_dct_path_image(path):
-    image_input_arr = get_image_as_arr(path)
-    image_frequency_domain = np.zeros((256,256))
-    
     input_image = get_image_as_pil_image(path)
     input_image.show()
-    for i in range(256):
-        image_frequency_domain[i, :] = dct1d(image_input_arr[i, :])
-    for j in range(256):
-        image_frequency_domain[:, j] = dct1d(image_frequency_domain[:, j])
-    # image_frequency_domain = 255*np.abs(image_frequency_domain)
-    image_frequency_domain = np.log(np.abs(image_frequency_domain)) + 1
-    image_frequency_domain *= (255.0/image_frequency_domain.max())
-    print(image_frequency_domain)
-    # dct_image = Image.fromarray(image_frequency_domain + 1)
-    dct_image = Image.fromarray(image_frequency_domain)
+
+    image_input_arr = get_image_as_arr(path)
+    image_frequency_domain = np.zeros((256,256))
+    print("Doing dct 2d")
+    image_frequency_domain = dct2d(image_input_arr)
+    # image_frequency_domain = np.log(np.abs(image_frequency_domain)+ 1) 
+    image_frequency_domain_normalized = normalize255(image_frequency_domain)
+    dct_image = Image.fromarray(image_frequency_domain_normalized)
+    # dct_image = Image.fromarray(image_frequency_domain_normalized)
+    dct_image.show()
+
+
+    image_time_domain = np.zeros((256,256))
+    output_arr = np.array(dct_image)
+    print("Doing idct 2d")
+    image_time_domain = dct2d(output_arr)
+    # image_time_domain = np.log(np.abs(image_time_domain)+ 1) 
+    image_time_domain_normalized = normalize255(image_time_domain)
+    dct_image = Image.fromarray(image_time_domain_normalized)
+    # dct_image = Image.fromarray(image_time_domain_normalized)
     dct_image.show()
 
 def main(argc, argv) -> int:
     assert argc >= 2, "Arguments should be greater than 2"
     run_dct_path_image(argv[argc-1])
-    debug_dct()
+    # debug_dct()
     return 0
 
 
