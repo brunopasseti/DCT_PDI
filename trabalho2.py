@@ -132,7 +132,6 @@ def run_dct_path_image(path):
 
     image_input_arr = get_image_as_arr(path)
     image_frequency_domain = np.zeros((256,256))
-    print("Doing dct 2d")
     image_frequency_domain = dct2d(image_input_arr)
     # image_frequency_domain = np.log(np.abs(image_frequency_domain)+ 1) 
     image_frequency_domain_normalized = normalize255(image_frequency_domain)
@@ -143,7 +142,6 @@ def run_dct_path_image(path):
 
     image_time_domain = np.zeros((256,256))
     output_arr = np.array(dct_image)
-    print("Doing idct 2d")
     image_time_domain = idct2d(output_arr)
     image_time_domain_normalized = normalize255(image_time_domain)
     dct_image = Image.fromarray(image_time_domain_normalized)
