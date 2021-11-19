@@ -7,6 +7,7 @@ import wave
 import math
 from numba import njit, jit
 from numpy.lib.type_check import imag
+import matplotlib.pyplot as plt
 
 def get_image_as_arr(path) -> np.ndarray:
     image_input = Image.open(path)
@@ -30,6 +31,36 @@ def get_wav_as_arr(path, normalised=True) -> np.array:
         audio_normalised = audio_as_np_float32 / max_int16
         return audio_normalised
     return audio_as_np_float32
+
+@njit
+def bass_filter(K):
+    degree = 2
+    fc = 100
+    g = 0.5
+    Y = g * 1 / (math.sqrt(1 + pow(K/fc, 2 * degree))) + 1
+    newK = K * Y
+    print('old K: ', K, ' | new K: ', newK, ' | Y: ', Y)
+    return newK
+
+@njit(parallel = True)
+def dct1d_bass_bosting(x: np.array) -> np.array:
+    N = len(x)
+    ks = list(range(N))
+    c_k = [(0.5)**0.5 if k == 0 else 1 for k in range(N)]
+    f_k = [bass_filter(k)/(2*N) for k in range(N)]
+    theta_k = [(bass_filter(k)*math.pi)/(2*N) for k in range(N)]
+    X = np.zeros(N)
+    constant_part = (2/N)**0.5
+    # for k in ks:
+    for i in prange(N):
+        sum = 0
+        for n in range(N):
+            sum += x[n] * math.cos(2 * math.pi * n * f_k[ks[i]] + theta_k[ks[i]])
+            # sum += x[n]*math.cos(2*math.pi*n*f_k[k] + theta_k[k])
+            
+        # X[k] = constant_part * c_k[k]*sum
+        X[ks[i]] = constant_part * c_k[ks[i]] * sum
+    return X
 
 @njit(parallel = True)
 def dct1d(x: np.array) -> np.array:
@@ -112,7 +143,7 @@ def debug_dct():
     test_image_after = Image.fromarray(test_array_frequency_domain_normalized)
     test_image_after.show()
     print(test_array_frequency_domain_normalized)
-    
+
 def run_dct_path_image(path):
     input_image = get_image_as_pil_image(path)
     input_image.show()
@@ -140,12 +171,13 @@ def run_dct_path_image(path):
 
 def main(argc, argv) -> int:
     assert argc >= 2, "Arguments should be greater than 2"
-    run_dct_path_image(argv[argc-1])
+    # run_dct_path_image(argv[argc-1])
+    wav_as_arr = get_wav_as_arr(argv[argc-1])
+    wav_after_dct = dct1d_bass_bosting(wav_as_arr)
+    plt.plot(wav_after_dct)
+    plt.show()
     # debug_dct()
     return 0
-
-
-
 
 if __name__ == "__main__":
     main(len(sys.argv), sys.argv)
