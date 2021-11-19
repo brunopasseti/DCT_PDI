@@ -1,5 +1,4 @@
 from numba.misc.special import prange
-from numba.np.ufunc import parallel
 import numpy as np
 from PIL import Image
 import sys
@@ -66,38 +65,44 @@ def dct1d_bass_bosting(x: np.array) -> np.array:
 def dct1d(x: np.array) -> np.array:
     N = len(x)
     ks = list(range(N))
-    c_k = [(0.5)**0.5 if k == 0 else 1 for k in range(N)]
-    f_k = [k/(2*N) for k in range(N)]
+    c = [(0.5)**0.5 if k == 0 else 1 for k in range(N)]
+    f = [k/(2*N) for k in range(N)]
     theta_k = [(k*math.pi)/(2*N) for k in range(N)]
     X = np.zeros(N)
     constant_part = (2/N)**0.5
-    # for k in ks:
     for i in prange(N):
         sum = 0
         for n in range(N):
-            sum += x[n]*math.cos(2*math.pi*n*f_k[ks[i]] + theta_k[ks[i]])
-            # sum += x[n]*math.cos(2*math.pi*n*f_k[k] + theta_k[k])
+            sum += x[n]*math.cos(2*math.pi*n*f[ks[i]] + theta_k[ks[i]])
             
-        # X[k] = constant_part * c_k[k]*sum
-        X[ks[i]] = constant_part * c_k[ks[i]]*sum
+        X[ks[i]] = constant_part * c[ks[i]] * sum
     return X
 
-@njit
-def idct(x: np.array) -> np.array:
-    return dct1d(x)
+@njit(parallel = True)
+def idct1d(X: np.array) -> np.array:
+    N = len(X)
+    ns = list(range(N))
+    c_k = [(0.5)**0.5 if k == 0 else 1 for k in range(N)]
+    f_k = [k/(2*N) for k in range(N)]
+    theta_k = [(k*math.pi)/(2*N) for k in range(N)]
+    x = np.zeros(N)
+    constant_part = (2/N)**0.5
+    for i in prange(N):
+        sum = 0
+        for k in range(N):
+            sum += c_k[k]*X[k]*math.cos(2*math.pi*ns[i]*f_k[k] + theta_k[k])
+            
+        x[ns[i]] = constant_part * sum
+    return x
 
 def generate_cosine_2d_arr_vertical(w: int, h:int) -> np.ndarray:
     arr = np.zeros((w,h))
-    # step = 2*math.pi/w
-    # print(step)
     for j in range(w):
         arr[:,j] = np.cos(np.linspace(0, 32*math.pi, num=h).astype(np.float64))
     return arr
 
 def generate_cosine_2d_arr_horizontal(w: int, h:int) -> np.ndarray:
     arr = np.zeros((w,h))
-    # step = 2*math.pi/w
-    # print(step)
     for i in range(h):
         arr[i,:] = np.cos(np.linspace(0, 32*math.pi, num=w).astype(np.float64))
     return arr
@@ -110,6 +115,15 @@ def dct2d(x: np.ndarray) -> np.ndarray:
     for j in range(h):
         X_arr_in_freq_domain[:,j] = dct1d(X_arr_in_freq_domain[:,j])
     return X_arr_in_freq_domain
+
+def idct2d(X: np.ndarray) -> np.ndarray:
+    w,h = X.shape
+    x_arr_in_freq_domain  = np.zeros((X.shape))
+    for i in range(w):
+        x_arr_in_freq_domain[i,:] = idct1d(X[i,:])
+    for j in range(h):
+        x_arr_in_freq_domain[:,j] = idct1d(x_arr_in_freq_domain[:,j])
+    return x_arr_in_freq_domain
 
 def new_dct(x):
     N = len(x)
@@ -155,19 +169,20 @@ def run_dct_path_image(path):
     # image_frequency_domain = np.log(np.abs(image_frequency_domain)+ 1) 
     image_frequency_domain_normalized = normalize255(image_frequency_domain)
     dct_image = Image.fromarray(image_frequency_domain_normalized)
-    # dct_image = Image.fromarray(image_frequency_domain_normalized)
     dct_image.show()
-
+    saveble_image = dct_image.convert("P")
+    saveble_image.save(open("dct.png", "wb"), "PNG")
 
     image_time_domain = np.zeros((256,256))
     output_arr = np.array(dct_image)
     print("Doing idct 2d")
-    image_time_domain = dct2d(output_arr)
-    # image_time_domain = np.log(np.abs(image_time_domain)+ 1) 
+    image_time_domain = idct2d(output_arr)
     image_time_domain_normalized = normalize255(image_time_domain)
     dct_image = Image.fromarray(image_time_domain_normalized)
-    # dct_image = Image.fromarray(image_time_domain_normalized)
     dct_image.show()
+    saveble_image = dct_image.convert("P")
+    saveble_image.save(open("idct.png", "wb"), "PNG")
+
 
 def main(argc, argv) -> int:
     assert argc >= 2, "Arguments should be greater than 2"
