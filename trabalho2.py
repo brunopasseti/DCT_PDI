@@ -74,8 +74,8 @@ def write_wav_from_arr(new_data: np.array, new_path: str, original_path: str):
 @jit
 def bass_filter(K: int ) -> float:
     degree = 6
-    fc = 100
-    g = 8
+    fc = 25000
+    g = 0.2
     Y:float = g / (math.sqrt(1 + math.pow(K/fc, 2 * degree))) + 1
 
     newK:float = K * Y
@@ -83,7 +83,7 @@ def bass_filter(K: int ) -> float:
     return newK
 
 @jit
-def low_pass_filter(K: int ) -> float:
+def low_pass_filter(K: int) -> float:
     if K < 20_000:
         return K
     return 0
@@ -141,7 +141,7 @@ def generate_cosine_2d_arr_horizontal(w: int, h:int) -> np.ndarray:
 def dct2d(x: np.ndarray) -> np.ndarray:
     w,h = x.shape
     X_arr_in_freq_domain  = np.zeros((x.shape))
-    progress_bar = Bar(" DCT2D", max=w+h,suffix = '%(percent).1f%% - %(elapsed)ds')
+    progress_bar = Bar("\tDCT2D", max=w+h,suffix = '%(percent).1f%% - %(elapsed)ds')
     for i in range(w):
         X_arr_in_freq_domain[i,:] = dct1d(x[i,:])
         progress_bar.next()
@@ -154,7 +154,7 @@ def dct2d(x: np.ndarray) -> np.ndarray:
 def idct2d(X: np.ndarray) -> np.ndarray:
     w,h = X.shape
     x_arr_in_freq_domain  = np.zeros((X.shape))
-    progress_bar = Bar("iDCT2D", max=w+h,suffix = '%(percent).1f%% - %(elapsed)ds')
+    progress_bar = Bar("\tiDCT2D", max=w+h,suffix = '%(percent).1f%% - %(elapsed)ds')
     for i in range(w):
         x_arr_in_freq_domain[i,:] = idct1d(X[i,:])
         progress_bar.next()
@@ -220,9 +220,56 @@ def run_dct_path_image(path):
     saveble_image = dct_image.convert("P")
     saveble_image.save(open("idct.png", "wb"), "PNG")
 
-def run_audio_test(path):
+
+def save_image(image: Image, title):
+    saveble_image = image.convert("P")
+    saveble_image.save(open(title, "wb"), "PNG", compress_level=0)
+    pass
+
+def topic_1(path, n=100):
+    print("[1] Running Topic 1:")
+    print("\t[1.1] Doing normalized DCT without DC component:")
+
+    image_input_arr = get_image_as_arr(path)
+    image_frequency_domain = np.zeros(image_input_arr.shape)
+    image_frequency_domain = dct2d(image_input_arr)
+    save_image(Image.fromarray(image_frequency_domain), "output/dct_lena.png")
+
+    image_without_dc = image_frequency_domain.copy()
+    image_without_dc[0][0] = 0
+    image_normalized_without_dc = normalize255(image_without_dc)
+    dct_image = Image.fromarray(image_normalized_without_dc)
+    print("\t DC Component value:", image_frequency_domain[0][0])
+    save_image(dct_image, "output/dct_of_lena_normalized_without_dc.png")
     
-    progress_bar = Bar("Applying filter to audio", max=6,suffix = '%(percent).1f%%')
+    lena_without_dc = np.zeros(image_input_arr.shape)
+    output_arr = np.array(dct_image)
+    lena_without_dc = idct2d(output_arr)
+    lena_without_dc_normalized = normalize255(lena_without_dc)
+    image_lena_normalized_without_dc = Image.fromarray(lena_without_dc_normalized)
+    save_image(image_lena_normalized_without_dc, "output/lena_normalized_without_dc.png")
+    
+    print("\t[1.2] Making an approximation using only the n largest coefficients. n =", n)
+    image_approximation = image_frequency_domain.flatten()
+    image_approximation_without_dc = image_approximation[1:]
+    indexes_to_be_zeroed = np.abs(image_approximation_without_dc).argsort()[:len(image_approximation)-n]
+    image_approximation_without_dc[indexes_to_be_zeroed] = 0
+    image_approximation[1:] = image_approximation_without_dc
+    image_approximation = image_approximation.reshape(image_input_arr.shape)
+    image_approximation_normalized = normalize255(image_approximation)
+    dct_image_aprox = Image.fromarray(image_approximation_normalized)
+    save_image(dct_image_aprox, "output/dct_lena_aprox.png")
+
+    output_arr = np.array(dct_image_aprox)
+    image_aprox_time_domain = idct2d(output_arr)
+    image_aprox_time_domain_normalized = normalize255(image_aprox_time_domain)
+    dct_image_aprox_output = Image.fromarray(image_aprox_time_domain_normalized)
+    save_image(dct_image_aprox_output, "output/lena_aprox_output.png")
+
+def topic_2(path):
+    print("[2] Running Topic 2:")
+    progress_bar = Bar("\tApplying filter to audio", max=4,suffix = '%(percent).1f%%')
+    print("")
     wav_as_arr = get_wav_as_arr(path)
     progress_bar.next()
     filtered_wav_frequency_domain = dct1d(wav_as_arr, bass_filter)
@@ -231,19 +278,25 @@ def run_audio_test(path):
     progress_bar.next()
     wav_frequency_domain = dct1d(wav_as_arr)
     progress_bar.next()
+
+    progress_bar = Bar("\tSaving Image", max=1,suffix = '%(percent).1f%%')
+    print("")
     fig, axs = plt.subplots(2,1)
     axs[0].plot(wav_frequency_domain)
     axs[1].plot(filtered_wav_frequency_domain)
-    plt.show()
-    progress_bar.next()
-    write_wav_from_arr(filtered_wav_time_domain, "result.wav", path)
+    plt.savefig("output/wav_compare.png", format="png")
     progress_bar.next()
 
+    progress_bar = Bar("\tSaving result", max=1,suffix = '%(percent).1f%%')
+    print("")
+    write_wav_from_arr(filtered_wav_time_domain, "output/result.wav", path)
+    progress_bar.next()
+    print("")
 
 def main(argc, argv) -> int:
     assert argc >= 2, "Arguments should be greater than 2"
-    # run_dct_path_image(argv[argc-1])
-    run_audio_test(argv[argc-1])
+    topic_1(argv[argc-3], int(argv[argc-2]))
+    topic_2(argv[argc-1])
     # debug_dct()
     return 0
 
