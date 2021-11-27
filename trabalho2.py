@@ -72,19 +72,17 @@ def write_wav_from_arr(new_data: np.array, new_path: str, original_path: str):
     return
 
 @jit
-def bass_filter(K: int ) -> float:
+def bass_boost(K: int ) -> float:
     degree = 6
     fc = 25000
     g = 0.2
-    Y:float = g / (math.sqrt(1 + math.pow(K/fc, 2 * degree))) + 1
-
+    Y:float = g / (math.sqrt(1 + math.pow(K/fc, 2 * degree))) + 1 
     newK:float = K * Y
-
     return newK
 
 @jit
 def low_pass_filter(K: int) -> float:
-    if K < 20_000:
+    if K < 12_520:
         return K
     return 0
 
@@ -272,7 +270,7 @@ def topic_2(path):
     print("")
     wav_as_arr = get_wav_as_arr(path)
     progress_bar.next()
-    filtered_wav_frequency_domain = dct1d(wav_as_arr, bass_filter)
+    filtered_wav_frequency_domain = dct1d(wav_as_arr, bass_boost)
     progress_bar.next()
     filtered_wav_time_domain = idct1d(filtered_wav_frequency_domain)
     progress_bar.next()
