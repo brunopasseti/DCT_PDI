@@ -8,6 +8,7 @@ from numba import njit, jit
 import matplotlib.pyplot as plt
 import typing
 from progress.bar import Bar
+import scipy as sci
 
 def get_image_as_arr(path) -> np.ndarray:
     image_input = Image.open(path)
@@ -74,11 +75,13 @@ def write_wav_from_arr(new_data: np.array, new_path: str, original_path: str):
 @jit
 def bass_boost(K: int ) -> float:
     degree = 6
-    fc = 25000
-    g = 0.2
+    fc = 1000
+    g = 0.1
+
     Y:float = g / (math.sqrt(1 + math.pow(K/fc, 2 * degree))) + 1 
-    newK:float = K * Y
-    return newK
+    
+    # newK:float = K * Y
+    return Y
 
 @jit
 def low_pass_filter(K: int) -> float:
@@ -96,7 +99,7 @@ def dct1d(x: np.array, k_function: typing.Callable = func_identity) -> np.array:
     ks = list(range(N))
     c = [(0.5)**0.5 if k == 0 else 1 for k in range(N)]
     f = [k_function(k)/(2.0*N) for k in ks]
-    theta_k = [(k_function(k)*math.pi)/(2.0*N) for k in ks]
+    theta_k = [(k*math.pi)/(2.0*N) for k in ks]
     X = np.zeros(N)
     constant_part = (2/N)**0.5
     for i in prange(N):
@@ -218,7 +221,6 @@ def run_dct_path_image(path):
     saveble_image = dct_image.convert("P")
     saveble_image.save(open("idct.png", "wb"), "PNG")
 
-
 def save_image(image: Image, title):
     saveble_image = image.convert("P")
     saveble_image.save(open(title, "wb"), "PNG", compress_level=0)
@@ -270,9 +272,14 @@ def topic_2(path):
     print("")
     wav_as_arr = get_wav_as_arr(path)
     progress_bar.next()
-    filtered_wav_frequency_domain = dct1d(wav_as_arr, bass_boost)
+    filtered_wav_frequency_domain = sci.fft.dct(wav_as_arr, norm="ortho")
     progress_bar.next()
-    filtered_wav_time_domain = idct1d(filtered_wav_frequency_domain)
+    N = len(filtered_wav_frequency_domain)
+    for i in range(N):
+        filtered_wav_frequency_domain[i] = filtered_wav_frequency_domain[i]*bass_boost(i)
+    #    filtered_wav_frequency_domain[i] = bass_boost(filtered_wav_frequency_domain[i])
+    progress_bar.next()
+    filtered_wav_time_domain = sci.fft.idct(filtered_wav_frequency_domain, norm="ortho")
     progress_bar.next()
     wav_frequency_domain = dct1d(wav_as_arr)
     progress_bar.next()
@@ -287,13 +294,14 @@ def topic_2(path):
 
     progress_bar = Bar("\tSaving result", max=1,suffix = '%(percent).1f%%')
     print("")
+    # filtered_wav_time_domain = np.int16(filtered_wav_time_domain / np.max(np.abs(filtered_wav_time_domain)) * 32767)
     write_wav_from_arr(filtered_wav_time_domain, "output/result.wav", path)
     progress_bar.next()
     print("")
 
 def main(argc, argv) -> int:
-    assert argc >= 2, "Arguments should be greater than 2"
-    topic_1(argv[argc-3], int(argv[argc-2]))
+    assert argc >= 1, "Arguments should be greater than 2"
+    # topic_1(argv[argc-3], int(argv[argc-2]))
     topic_2(argv[argc-1])
     # debug_dct()
     return 0
