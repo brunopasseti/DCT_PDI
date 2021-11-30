@@ -8,7 +8,8 @@ from numba import njit, jit
 import matplotlib.pyplot as plt
 import typing
 from progress.bar import Bar
-import scipy as sci
+import scipy.fft as fft
+from scipy.io import wavfile
 
 def get_image_as_arr(path) -> np.ndarray:
     image_input = Image.open(path)
@@ -24,63 +25,38 @@ def get_wav_as_arr(path, normalised=True) -> np.array:
 
     # Convert buffer to float64 using NumPy                                                                                 
     audio_as_np_int16 = np.frombuffer(audio, dtype=np.int16)
-    audio_as_np_float64 = audio_as_np_int16.astype(np.float64)
+    audio_as_np_float64 = np.frombuffer(audio, dtype=np.float64)
 
     # Normalise float64 array so that values are between -1.0 and +1.0                                                      
     max_int16 = 2**15
     if(normalised):
-        audio_normalised = audio_as_np_float64 / max_int16
+        audio_normalised = audio_as_np_int16 / max_int16
         return audio_normalised
-    return audio_as_np_float64
+    return audio_as_np_int16
 
 def write_wav_from_arr(new_data: np.array, new_path: str, original_path: str):
-    unormalised_new_data = new_data * 2**15
-    unormalised_new_data = unormalised_new_data.astype(np.int16)
+    # unormalised_new_data = new_data * 2**15
+    # unormalised_new_data = unormalised_new_data.astype(np.int16)
+    unormalised_new_data = new_data
     new_file = wave.open(new_path, 'wb')
     original_file = wave.open(original_path)
-    # original_data = get_wav_as_arr(original_path)
-    # print("""Writing File: {} 
-    # \t- Data Size: {}
-    # \t- Nframes: {}
-    # \t- Nchannels: {}
-    # \t- Width: {}
-    # \t- Framerate: {}""".format(
-    #     original_path,
-    #     len(original_data),
-    #     original_file.getnframes(),
-    #     original_file.getnchannels(),
-    #     original_file.getsampwidth(),
-    #     original_file.getframerate()
-    # ))
+
     new_file.setnchannels(original_file.getnchannels())
     new_file.setsampwidth(original_file.getsampwidth())
     new_file.setframerate(original_file.getframerate())
     new_file.setnframes(len(unormalised_new_data))
     new_file.writeframesraw(unormalised_new_data)
-    # print("""Writing File: {} 
-    # \t- Data Size: {}
-    # \t- Nframes: {}
-    # \t- Nchannels: {}
-    # \t- Width: {}
-    # \t- Framerate: {}""".format(
-    #     new_path,
-    #     len(unormalised_new_data),
-    #     new_file.getnframes(),
-    #     new_file.getnchannels(),
-    #     new_file.getsampwidth(),
-    #     new_file.getframerate()
-    # ))
+
     return
 
 @jit
 def bass_boost(K: int ) -> float:
     degree = 6
     fc = 1000
-    g = 0.1
+    g = 10
 
-    Y:float = g / (math.sqrt(1 + math.pow(K/fc, 2 * degree))) + 1 
+    Y:float = (g / (math.sqrt(1.0 + math.pow(K/fc, 2.0 * degree)))) + 1.0
     
-    # newK:float = K * Y
     return Y
 
 @jit
@@ -270,18 +246,18 @@ def topic_2(path):
     print("[2] Running Topic 2:")
     progress_bar = Bar("\tApplying filter to audio", max=4,suffix = '%(percent).1f%%')
     print("")
-    wav_as_arr = get_wav_as_arr(path)
+    # wav_as_arr = get_wav_as_arr(path, False)
+    _, wav_as_arr = wavfile.read(path)
     progress_bar.next()
-    filtered_wav_frequency_domain = sci.fft.dct(wav_as_arr, norm="ortho")
+    filtered_wav_frequency_domain = fft.dct(wav_as_arr, norm="ortho")
     progress_bar.next()
     N = len(filtered_wav_frequency_domain)
     for i in range(N):
-        filtered_wav_frequency_domain[i] = filtered_wav_frequency_domain[i]*bass_boost(i)
-    #    filtered_wav_frequency_domain[i] = bass_boost(filtered_wav_frequency_domain[i])
+        filtered_wav_frequency_domain[i] *= bass_boost(i)
     progress_bar.next()
-    filtered_wav_time_domain = sci.fft.idct(filtered_wav_frequency_domain, norm="ortho")
+    filtered_wav_time_domain = fft.idct(filtered_wav_frequency_domain, norm="ortho")
     progress_bar.next()
-    wav_frequency_domain = dct1d(wav_as_arr)
+    wav_frequency_domain = fft.dct(wav_as_arr, norm="ortho")
     progress_bar.next()
 
     progress_bar = Bar("\tSaving Image", max=1,suffix = '%(percent).1f%%')
@@ -294,7 +270,7 @@ def topic_2(path):
 
     progress_bar = Bar("\tSaving result", max=1,suffix = '%(percent).1f%%')
     print("")
-    # filtered_wav_time_domain = np.int16(filtered_wav_time_domain / np.max(np.abs(filtered_wav_time_domain)) * 32767)
+    filtered_wav_time_domain = np.int16(filtered_wav_time_domain / np.max(np.abs(filtered_wav_time_domain)) * 32767)
     write_wav_from_arr(filtered_wav_time_domain, "output/result.wav", path)
     progress_bar.next()
     print("")
